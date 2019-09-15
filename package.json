@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "start": "parcel src/index.html"
+  },
+  "devDependencies": {
+    "electron": "^6.0.9",
+    "elm-hot": "^1.1.2",
+    "less": "^3.10.3",
+    "node-elm-compiler": "^5.0.4"
+  }
+}
