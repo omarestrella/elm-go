@@ -1,13 +1,11 @@
 module Main exposing (main)
 
+import Array exposing (Array)
 import Browser exposing (Document, UrlRequest(..))
-import Browser.Navigation as Navigation
-import Html exposing (Html, div, span, text)
-import Html.Attributes exposing (class)
-import Page.Home as Home
-import Page.Post as Post
-import Routing exposing (Route(..))
-import Url exposing (Url)
+import Html exposing (Html, button, div, text)
+import Html.Attributes exposing (attribute, class, style)
+import Html.Events exposing (onClick)
+import Json.Encode as Encode
 
 
 
@@ -16,131 +14,78 @@ import Url exposing (Url)
 
 type Msg
     = NoOp
-    | ClickedLink UrlRequest
-    | ChangedUrl Url
-    | GotPostMsg Post.Msg
-    | GotHomeMsg Home.Msg
 
 
-type PageModel
-    = Home Home.Model
-    | Post Post.Model
-    | NotFound
+type Intersection
+    = Black
+    | White
+    | Empty
+
+
+type alias Board =
+    Array (Array Intersection)
 
 
 type alias Model =
-    { navKey : Navigation.Key
-    , currentRoute : Route
-    , pageModel : PageModel
-    }
+    { board : Board }
+
+
+size : Board -> Int
+size board =
+    Array.length board
 
 
 
 -- Update
 
 
-updateModel : (subModel -> PageModel) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
-updateModel toModel toMsg model ( subModel, subCmd ) =
-    let
-        pageModel =
-            toModel subModel
-    in
-    ( { model | pageModel = pageModel }
-    , Cmd.map toMsg subCmd
-    )
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    let
-        route =
-            Routing.routeTo model.navKey
-    in
-    case ( msg, model.pageModel ) of
-        -- Handle messages from individual pages
-        ( GotPostMsg postMsg, Post postModel ) ->
-            Post.update postMsg postModel
-                |> updateModel Post GotPostMsg model
-
-        ( GotHomeMsg homeMsg, Home homeModel ) ->
-            Home.update homeMsg homeModel
-                |> updateModel Home GotHomeMsg model
-
-        -- Handle URL changes
-        ( ChangedUrl url, _ ) ->
-            let
-                currentRoute =
-                    Routing.routeFromUrl url
-            in
-            ( { model | currentRoute = currentRoute, pageModel = defaultPageModel currentRoute }, Cmd.none )
-
-        ( ClickedLink request, _ ) ->
-            case request of
-                Internal url ->
-                    ( model
-                    , route url
-                    )
-
-                External url ->
-                    ( model, Navigation.load url )
-
-        ( NoOp, _ ) ->
+    case msg of
+        NoOp ->
             ( model, Cmd.none )
-
-        -- Mismatched messages dont do anything
-        ( GotHomeMsg _, _ ) ->
-            ( model, Cmd.none )
-
-        ( GotPostMsg _, _ ) ->
-            ( model, Cmd.none )
-
-
-defaultPageModel : Route -> PageModel
-defaultPageModel route =
-    case route of
-        PostRoute post ->
-            Post (Post.defaultModel (Just post))
-
-        HomeRoute ->
-            Home Home.defaultModel
-
-        NotFoundRoute ->
-            NotFound
 
 
 
 -- Views
 
 
-navView : Html Msg
-navView =
-    div [ class "navigation" ]
-        [ span [] [ Routing.routeLink "Home" ( HomeRoute, Nothing ) ]
-        , span [] [ Routing.routeLink "Post 1" ( PostRoute 1, Nothing ) ]
+intersection row col =
+    div
+        [ class "intersection"
+        , attribute "data-row" (String.fromInt row)
+        , attribute "data-col" (String.fromInt col)
         ]
+        []
 
 
-pageView : Model -> Html Msg
-pageView model =
-    case model.pageModel of
-        Home homeModel ->
-            Home.view homeModel
-                |> Html.map GotHomeMsg
-
-        Post postModel ->
-            Post.view postModel
-                |> Html.map GotPostMsg
-
-        NotFound ->
-            div [] [ text "Not found!" ]
+boardView size_ =
+    div
+        [ class "board" ]
+        (List.map
+            (\currentRow ->
+                div
+                    [ class "row"
+                    ]
+                    (List.map
+                        (\currentCol ->
+                            intersection currentRow currentCol
+                        )
+                        (List.range 0 (size_ - 1))
+                    )
+            )
+            (List.range 0 (size_ - 1))
+        )
 
 
 mainView : Model -> Html Msg
 mainView model =
+    let
+        size_ =
+            size model.board
+    in
     div [ class "main" ]
-        [ navView
-        , pageView model
-        ]
+        [ boardView size_ ]
 
 
 view : Model -> Browser.Document Msg
@@ -154,27 +99,24 @@ view model =
 -- Main
 
 
-init : String -> Url -> Navigation.Key -> ( Model, Cmd Msg )
-init _ url key =
-    let
-        currentRoute =
-            Routing.routeFromUrl url
-    in
-    ( { navKey = key, currentRoute = currentRoute, pageModel = Home {} }
-    , Cmd.batch
-        [ Routing.routeTo key url
-        , Cmd.none
-        ]
+emptyBoard : Int -> Board
+emptyBoard size_ =
+    Array.initialize size_
+        (\_ -> Array.initialize size_ (always Empty))
+
+
+init : String -> ( Model, Cmd Msg )
+init _ =
+    ( { board = emptyBoard 9 }
+    , Cmd.none
     )
 
 
 main : Program String Model Msg
 main =
-    Browser.application
+    Browser.document
         { init = init
         , view = view
         , update = update
         , subscriptions = \_ -> Sub.none
-        , onUrlRequest = ClickedLink
-        , onUrlChange = ChangedUrl
         }
