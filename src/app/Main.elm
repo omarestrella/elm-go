@@ -14,6 +14,7 @@ import Json.Encode as Encode
 
 type Msg
     = NoOp
+    | Click Int Int
 
 
 type Intersection
@@ -22,12 +23,23 @@ type Intersection
     | Empty
 
 
+type Player
+    = First
+    | Second
+
+
+type alias Row =
+    Array Intersection
+
+
 type alias Board =
-    Array (Array Intersection)
+    Array Row
 
 
 type alias Model =
-    { board : Board }
+    { board : Board
+    , currentPlayer : Player
+    }
 
 
 size : Board -> Int
@@ -45,47 +57,99 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        Click row col ->
+            let
+                nextPlayer =
+                    case model.currentPlayer of
+                        First ->
+                            Second
+
+                        Second ->
+                            First
+
+                intersectionValue =
+                    case model.currentPlayer of
+                        First ->
+                            Black
+
+                        Second ->
+                            White
+
+                currentRow =
+                    Array.get row model.board |> Maybe.withDefault (Array.fromList [])
+
+                newRow =
+                    Array.set col intersectionValue currentRow
+
+                newBoard =
+                    Array.set row newRow model.board
+            in
+            ( { model | board = newBoard, currentPlayer = nextPlayer }, Cmd.none )
+
 
 
 -- Views
 
 
-intersection row col =
+intersection : Int -> ( Int, Intersection ) -> Html Msg
+intersection row ( col, state ) =
     div
         [ class "intersection"
         , attribute "data-row" (String.fromInt row)
         , attribute "data-col" (String.fromInt col)
         ]
-        []
+        [ case state of
+            Black ->
+                div [ class "piece black" ] []
+
+            White ->
+                div [ class "piece white" ] []
+
+            Empty ->
+                div [ class "piece empty", onClick (Click row col) ] []
+        ]
 
 
-boardView size_ =
+rowView : Board -> Int -> Html Msg
+rowView board rowPos =
+    let
+        size_ =
+            size board
+
+        maybeRow =
+            Array.get rowPos board
+    in
+    case maybeRow of
+        Just row ->
+            div
+                [ class "row" ]
+                (List.map
+                    (intersection rowPos)
+                    (Array.toIndexedList row)
+                )
+
+        Nothing ->
+            text ""
+
+
+boardView : Board -> Html Msg
+boardView board =
+    let
+        size_ =
+            size board
+    in
     div
         [ class "board" ]
         (List.map
-            (\currentRow ->
-                div
-                    [ class "row"
-                    ]
-                    (List.map
-                        (\currentCol ->
-                            intersection currentRow currentCol
-                        )
-                        (List.range 0 (size_ - 1))
-                    )
-            )
-            (List.range 0 (size_ - 1))
+            (rowView board)
+            (List.range 1 size_)
         )
 
 
 mainView : Model -> Html Msg
 mainView model =
-    let
-        size_ =
-            size model.board
-    in
     div [ class "main" ]
-        [ boardView size_ ]
+        [ boardView model.board ]
 
 
 view : Model -> Browser.Document Msg
@@ -107,7 +171,7 @@ emptyBoard size_ =
 
 init : String -> ( Model, Cmd Msg )
 init _ =
-    ( { board = emptyBoard 9 }
+    ( { board = emptyBoard 9, currentPlayer = First }
     , Cmd.none
     )
 

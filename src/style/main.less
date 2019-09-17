@@ -65,3 +65,34 @@ div.main {
     width: 20px;
   }
 }
+
+.piece {
+  position: absolute;
+  z-index: 1;
+
+  display: block;
+  width: 30px;
+  height: 30px;
+
+  margin-top: 4px;
+  margin-left: 4px;
+
+  border-radius: 100%;
+  border: 1px solid black;
+
+  &.empty {
+    border: none;
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+
+  &.white {
+    background: white;
+  }
+
+  &.black {
+    background: black;
+  }
+}
